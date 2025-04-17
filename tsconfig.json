@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  }
+}

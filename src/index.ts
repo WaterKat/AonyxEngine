@@ -8,12 +8,21 @@ const router = express.Router();
 
 
 
-app.use('/api/v1',router);
+
+const statusRouter = express.Router();
+//TODO fix assert statement
+//import VersionJson from "./version.json" assert { type: "json"};
+statusRouter.get("/version");
+
+
+//? 
+app.use('/api/v1', router);
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
+//listen
 app.listen(port, () => {
   console.log(`listening on port ${port}`);
 });
