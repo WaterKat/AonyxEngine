@@ -1,4 +1,6 @@
 import express from "express";
+import 'dotenv/config';
+
 import statusRouter from "./utils-router.js";
 
 //vars
@@ -19,3 +21,4 @@ app.use(statusRouter);
 app.listen(port, () => {
   console.log(`listening on port ${port}`);
 });
+
