@@ -4,6 +4,7 @@ import 'dotenv/config';
 import statusRouter from "./utils-router.js";
 import authRouter from "./auth-router.js";
 
+
 //vars
 const port = process.env.PORT || 3010;
 const app = express();

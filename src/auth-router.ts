@@ -43,5 +43,4 @@ authRouter.get('/auth/twitch', async (req, res) => {
 });
 
 
-
 export default authRouter;
