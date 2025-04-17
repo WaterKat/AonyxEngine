@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
+    "setup": "npm ci && bash ./setup.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
