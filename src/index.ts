@@ -3,26 +3,33 @@ import express from "express";
 const port = process.env.PORT || 3010;
 const app = express();
 
-
-const router = express.Router();
-
-
-
+//MARK: STATUS
+import ApplicationInfoJson from "./version.json" with { type: "json"};
 
 const statusRouter = express.Router();
-//TODO fix assert statement
-//import VersionJson from "./version.json" assert { type: "json"};
-statusRouter.get("/version");
 
-
-//? 
-app.use('/api/v1', router);
-
-app.get("/", (req, res) => {
-  res.send("Hello World!");
+statusRouter.get("/", (req, res) => {
+  res.status(200).send(`hello world from ${ApplicationInfoJson.application}!`);
 });
 
-//listen
+statusRouter.get("/version", (req, res) => {
+  res.status(200).json(ApplicationInfoJson);
+});
+
+statusRouter.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timeStamp: Date.now() });
+});
+
+app.use(statusRouter);
+
+
+//MARK: API
+const router = express.Router();
+
+app.use('/api/v1', router);
+
+
+//MARK: LISTEN
 app.listen(port, () => {
   console.log(`listening on port ${port}`);
 });
