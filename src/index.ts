@@ -1,6 +1,7 @@
 import express from "express";
 import 'dotenv/config';
 
+import './twitch-utils.ts';
 import statusRouter from "./utils-router.js";
 import authRouter from "./auth-router.js";
 
