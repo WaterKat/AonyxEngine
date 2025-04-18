@@ -1,13 +1,13 @@
 import express from "express";
 import 'dotenv/config';
 
-import './twitch-utils.ts';
+import { twitchAuthRouter } from './twitch-utils.js';
 import statusRouter from "./utils-router.js";
 import authRouter from "./auth-router.js";
 
 
 //vars
-const port = process.env.PORT || 3010;
+const port = process.env.PORT || 3000;
 const app = express();
 
 
@@ -19,6 +19,7 @@ const router = express.Router();
 app.use('/api/v1', router);
 app.use(statusRouter);
 app.use(authRouter);
+app.use(twitchAuthRouter);
 
 
 //MARK: LISTEN
