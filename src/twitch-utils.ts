@@ -1,40 +1,46 @@
 import WebSocket from "ws";
-
+import { Router } from "express";
+import 'dotenv/config';
 
 const twitch_event_wss = process.env.TWITCH_EVENT_WSS
+const twitch_sub_url = process.env.TWITCH_SUBSCRIPTION_URL;
+const twitch_client_id = process.env.TWITCH_CLIENT_ID;
+const twitch_auth_code_url = process.env.TWITCH_AUTH_CODE_URL;
+const twitch_auth_redirect_uri = process.env.TWITCH_AUTH_REDIRECT_URI;
 
 
-const twitchWS = new WebSocket(twitch_event_wss);
+//MARK: SUBSCRIPTIONS
+//TODO subscription function after successful websocket connection
 
+//MARK: WEBSOCKETS
+export const twitchWebSocket = new WebSocket(twitch_event_wss);
 
-twitchWS.on('open', () => {
+twitchWebSocket.on('open', () => {
     console.log(`[${Date.now()}] twitchWS: connected`);
 });
 
-
-twitchWS.on('error', (err) => {
+twitchWebSocket.on('error', (err) => {
     console.error(`[${Date.now()}] twitchWS: ${err}`);
 });
 
-
-twitchWS.on('close', () => {
+twitchWebSocket.on('close', () => {
     console.log(`[${Date.now()}] twitchWS: disconnected`);
 });
 
-
-twitchWS.on('message', (rawData) => {
+twitchWebSocket.on('message', (rawData) => {
     const data = JSON.parse(rawData.toString());
-    console.log(`[${Date.now()}] twitchWS: ${JSON.stringify(data, null, 2)}`);
+
+
+    switch (data.metadata.message_type) {
+        case 'session_welcome':
+            console.log(`[${Date.now()}] twitchWS: session_welcome ${JSON.stringify(data.payload, null, 2)}`)
+            break;
+        case 'notification':
+            console.log(`[${Date.now()}] twitchWS: notification ${JSON.stringify(data.payload, null, 2)}`)
+            break;
+        default:
+            console.log(`[${Date.now()}] twitchWS: default ${JSON.stringify(data, null, 2)}`);
+            break;
+    }
 });
 
-
-function Cleanup() {
-    if (twitchWS.readyState === twitchWS.OPEN) 
-        twitchWS.close();
-}
-
-/*
-process.on('SIGINT', Cleanup);
-process.on('SIGQUIT', Cleanup);
-process.on('SIGTERM', Cleanup);
-*/
