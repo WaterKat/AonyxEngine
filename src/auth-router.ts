@@ -2,11 +2,18 @@ import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
 import 'dotenv/config';
-import { Response } from 'express-serve-static-core';
+import { type Response } from 'express-serve-static-core';
+import jwt from 'jsonwebtoken';
 
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const supabase_jwt_secret = process.env.SUPABASE_JWT_SECRET;
+
+if (supabase_jwt_secret === "" || !supabase_jwt_secret) {
+    console.error('Please set the SUPABASE_JWT_SECRET environmental variable');
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey, {
     db: { schema: 'private' }
 })
@@ -92,7 +99,16 @@ async function fetchJSON<T = any>(input: string | URL | globalThis.Request, init
     }
 }
 
-
+function decodeJWT<T = any>(token: string, secretOrPublicKey: jwt.Secret | jwt.PublicKey, options?: jwt.VerifyOptions & {
+    complete?: false;
+}): { data: T, error: Error } {
+    try {
+        const decoded = jwt.verify(token, secretOrPublicKey, options)
+        return { data: decoded as T, error: undefined };
+    } catch (e) {
+        return { data: undefined, error: e }
+    }
+}
 
 
 //MARK: DATABASE
@@ -101,10 +117,7 @@ const authRouter = Router();
 
 //MARK: CALLBACK
 authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
-    const fail = (reason: string, ...args: any[]) => {
-        console.error(`[${new Date().toISOString()}] /auth/v1/callback ${reason}`, ...args);
-        return res.status(400).send(redirectHTML('authentication failed', 10));
-    };
+    const fail = createFailResponseFunction(res, '/auth/v1/callback', 'authentication failed', 10);
 
     const { code, scope, error, error_description, state } = req.query;
 
@@ -194,6 +207,33 @@ authRouter.get('/auth/v1/twitch/login', async (req, res) => {
 authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
     const fail = createFailResponseFunction(res, '/auth/v1/twitch/token', 'request failed', 10);
 
+    const token = req.header["Authorization"] ?? "";
+    //    const { data: user_jwt_data, error: user_jwt_error } = decodeJWT(token, supabase_jwt_secret);
+    //region: //TODO
+    const { data: { user: user_data }, error: user_error } = await supabase.auth.getUser(token);
+    let user = user_data;
+
+    if (process.env.NODE_ENV === 'development' && user_error) {
+        console.error(`[${new Date().toISOString()}] /auth/v1/twitch/token`, user_error);
+        console.warn(`[${new Date().toISOString()}] DEVELOPMENT MODE using MOCK USER`);
+        const token = jwt.sign({
+
+        }, process.env.SUPABASE_JWT_SECRET);
+        const { data: { user: mock_user }, error: mock_error } = await supabase.auth.getUser();
+        if (mock_error)
+            return fail('invalid user and failed mock', user_error, mock_error);
+        else
+            user = mock_user;
+    }
+    else
+        return fail('invalid user', user_error);
+
+    if (!user || user_error) {
+        console.log('anon redirected to login', user_error);
+        return res.redirect('/auth/v1/twitch/login');
+    }
+    //endregion
+
     const timeout_in_minutes = 5;
     const force_verify = req.query['force_verify']?.toString() ?? 'false';
     const state = randomBytes(16).toString('hex')
@@ -212,6 +252,7 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
     const code_request_url = code_endpoint + '?' + search_params;
 
     const { error } = await supabase.from('oauth_states').insert([{
+        user_id: user_data.id,
         state: state,
         provider: 'twitch',
         expires_at: new Date(Date.now() + (1000 * 60 * timeout_in_minutes)).toISOString(),
@@ -226,3 +267,4 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
 
 //
 export { authRouter };
+
