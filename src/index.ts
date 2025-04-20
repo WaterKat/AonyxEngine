@@ -3,6 +3,11 @@ import 'dotenv/config';
 
 import statusRouter from "./utils-router.js";
 import { authRouter } from "./auth-router.js";
+import ApplicationInfoJson from "./version.json" with { type: "json"};
+
+//MARK:SETUP
+if (process.env.NODE_ENV === "development")
+  console.warn(`[${new Date().toISOString()}] ${ApplicationInfoJson.application.toUpperCase()} is running in DEVELOPMENT mode`);
 
 
 //vars
