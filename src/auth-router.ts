@@ -66,12 +66,11 @@ function redirectHTML(message: string, timeoutInSeconds: number, redirect: strin
     `;
 }
 
-function createFailResponseFunction(res: Response, endpoint: string, public_message: string, timeout_in_seconds: number, code: number = 400) {
-    const fail = (reason: string, ...args: any[]) => {
-        console.error(`[${new Date().toISOString()}] ${endpoint} ${reason}`, ...args);
-        return res.status(code).send(redirectHTML(public_message, timeout_in_seconds));
+function createRedirectResponseFunction(res: Response, endpoint: string, public_message: string, options?: { code?: number, redirect?: string, timeout_in_seconds?: number, logType?: 'log' | 'info' | 'warn' | 'error' }) {
+    return (reason: string, ...args: any[]) => {
+        console[options?.logType ?? 'log'](`[${new Date().toISOString()}] ${endpoint} ${reason}`, ...args);
+        return res.status(options?.code ?? 200).send(redirectHTML(public_message, options?.timeout_in_seconds ?? 5, options?.redirect));
     };
-    return fail;
 }
 
 function arrayIsEqual(a: any[], b: any[]): boolean {
@@ -117,7 +116,8 @@ const authRouter = Router();
 
 //MARK: CALLBACK
 authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
-    const fail = createFailResponseFunction(res, '/auth/v1/callback', 'authentication failed', 10);
+    const success = createRedirectResponseFunction(res, '/auth/v1/twitch/token', 'authentication successful!');
+    const fail = createRedirectResponseFunction(res, '/auth/v1/callback', 'authentication failed', { code: 400, logType: 'error' });
 
     const { code, scope, error, error_description, state } = req.query;
 
@@ -205,7 +205,7 @@ authRouter.get('/auth/v1/twitch/login', async (req, res) => {
 });
 
 authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
-    const fail = createFailResponseFunction(res, '/auth/v1/twitch/token', 'request failed', 10);
+    const fail = createRedirectResponseFunction(res, '/auth/v1/twitch/token', 'request failed', { code: 400, logType: 'error' });
 
     const token = req.header["Authorization"] ?? "";
     //    const { data: user_jwt_data, error: user_jwt_error } = decodeJWT(token, supabase_jwt_secret);
