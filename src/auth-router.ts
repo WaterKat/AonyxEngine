@@ -88,27 +88,25 @@ function arrayIsEqual(a: any[], b: any[]): boolean {
     return true;
 }
 
-async function fetchJSON<T = any>(input: string | URL | globalThis.Request, init?: RequestInit): Promise<{ data: T, error: Error }> {
-    try {
-        const response = await fetch(input, init);
-        const json = await response.json();
-        return { data: json as T, error: undefined };
-    } catch (e) {
-        return { data: undefined, error: e };
-    }
-}
+type SafelyResultSuccess<T> = { data: T, error: undefined };
+type SafelyResultFailure = { data: undefined, error: Error; }
+type SafelyResult<T> = SafelyResultSuccess<T> | SafelyResultFailure;
 
-function decodeJWT<T = any>(token: string, secretOrPublicKey: jwt.Secret | jwt.PublicKey, options?: jwt.VerifyOptions & {
-    complete?: false;
-}): { data: T, error: Error } {
+function safelyRun<K extends (...args: any[]) => any>(func: K, ...args: Parameters<K>): SafelyResult<ReturnType<K>> {
     try {
-        const decoded = jwt.verify(token, secretOrPublicKey, options)
-        return { data: decoded as T, error: undefined };
+        return { data: func(...args), error: undefined };
     } catch (e) {
-        return { data: undefined, error: e }
+        return { data: undefined, error: e instanceof Error ? e : new Error(String(e)) };
     }
-}
+};
 
+async function safelyRunAsync<K extends (...args: any[]) => Promise<any>>(func: K, ...args: Parameters<K>): Promise<SafelyResult<Awaited<ReturnType<K>>>> {
+    try {
+        return { data: await func(...args), error: undefined };
+    } catch (e) {
+        return { data: undefined, error: e instanceof Error ? e : new Error(String(e)) };
+    }
+};
 
 //MARK: DATABASE
 const authRouter = Router();
@@ -131,7 +129,8 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
 
     if (!provider_map[provider]) return fail('provider-error', provider);
 
-    const { data: token_req_data, error: token_req_error } = await fetchJSON(provider_map[provider].api_endpoint, {
+    const { data: token_req_data, error: token_req_error } = await safelyRunAsync(() => fetch(
+        provider_data.token_endpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -143,7 +142,8 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
             grant_type: 'authorization_code',
             redirect_uri: provider_map[provider].redirect_uri
         }).toString()
-    });
+    }
+    ).then(response => response.json()));
 
     if (token_req_error) return fail('token-req-error', token_req_error);
     if (!token_req_data.refresh_token) return fail('token-req-error', token_req_data);
