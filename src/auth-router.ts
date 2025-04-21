@@ -207,32 +207,38 @@ authRouter.get('/auth/v1/twitch/login', async (req, res) => {
 authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
     const fail = createRedirectResponseFunction(res, '/auth/v1/twitch/token', 'request failed', { code: 400, logType: 'error' });
 
-    const token = req.header["Authorization"] ?? "";
-    //    const { data: user_jwt_data, error: user_jwt_error } = decodeJWT(token, supabase_jwt_secret);
-    //region: //TODO
-    const { data: { user: user_data }, error: user_error } = await supabase.auth.getUser(token);
-    let user = user_data;
+    let provided_token = req.header["Authorization"];
 
-    if (process.env.NODE_ENV === 'development' && user_error) {
-        console.error(`[${new Date().toISOString()}] /auth/v1/twitch/token`, user_error);
-        console.warn(`[${new Date().toISOString()}] DEVELOPMENT MODE using MOCK USER`);
-        const token = jwt.sign({
-
-        }, process.env.SUPABASE_JWT_SECRET);
-        const { data: { user: mock_user }, error: mock_error } = await supabase.auth.getUser();
-        if (mock_error)
-            return fail('invalid user and failed mock', user_error, mock_error);
-        else
-            user = mock_user;
+    if (process.env.NODE_ENV === "development" && (!provided_token || provided_token === "")) {
+        console.warn(`[${new Date().toISOString()}] Token not provided. DEVELOPMENT MODE using MOCK USER`);
+        const { data: mock_token, error: mock_token_error } = safelyRun(() => jwt.sign({
+            sub: process.env.SUPABASE_MOCK_USER_ID,
+            email: process.env.SUPABASE_MOCK_EMAIL,
+            role: 'authenticated',
+            exp: Math.floor(Date.now() / 1000) + 60 * 60,
+            aud: "authenticated",
+            app_metadata: {
+                provider: "email",
+                providers: ["email"],
+            },
+            user_metadata: {
+                full_name: "AonyxEngine"
+            }
+        }, process.env.SUPABASE_JWT_SECRET, { algorithm: 'HS256' }));
+        if (mock_token_error) {
+            console.error(`[${new Date().toISOString()}] /auth/v1/twitch/token DEVELOPMENT MODE`, mock_token_error);
+        } else {
+            provided_token = mock_token;
+        }
     }
-    else
-        return fail('invalid user', user_error);
 
-    if (!user || user_error) {
-        console.log('anon redirected to login', user_error);
+    const { data: user_data, error: sb_user_error } = await supabase.auth.getUser(provided_token);
+    const { user } = user_data;
+
+    if (!user || sb_user_error) {
+        console.log('anon redirected to login', sb_user_error);
         return res.redirect('/auth/v1/twitch/login');
     }
-    //endregion
 
     const timeout_in_minutes = 5;
     const force_verify = req.query['force_verify']?.toString() ?? 'false';
@@ -252,7 +258,7 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
     const code_request_url = code_endpoint + '?' + search_params;
 
     const { error } = await supabase.from('oauth_states').insert([{
-        user_id: user_data.id,
+        user_id: user.id,
         state: state,
         provider: 'twitch',
         expires_at: new Date(Date.now() + (1000 * 60 * timeout_in_minutes)).toISOString(),
