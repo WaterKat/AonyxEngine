@@ -11,7 +11,8 @@ if (process.env.NODE_ENV === "development")
 
 
 //vars
-const port = process.env.PORT || 3000;
+const port = +process.env.PORT || 3000;
+const host = process.env.NODE_ENV === 'development' ? '127.0.0.1' : process.env.HOST ?? '0.0.0.0';
 const app = express();
 
 
@@ -26,7 +27,7 @@ app.use(authRouter);
 
 
 //MARK: LISTEN
-app.listen(port, () => {
-  console.log(`listening on port ${port}`);
+app.listen(port, host, () => {
+  console.log(`listening on host ${host} port ${port}`);
 });
 
