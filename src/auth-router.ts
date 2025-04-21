@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { randomBytes } from 'crypto';
+import { type CipherGCMTypes, type CipherKey, createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import 'dotenv/config';
 import { type Response } from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
@@ -9,6 +9,10 @@ import jwt from 'jsonwebtoken';
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase_jwt_secret = process.env.SUPABASE_JWT_SECRET;
+
+const aonyxengine_secret_algorithm = 'aes-256-gcm';
+const aonyxengine_secret_key = process.env.AONYXENGINE_SECRET_KEY
+
 
 if (supabase_jwt_secret === "" || !supabase_jwt_secret) {
     console.error('Please set the SUPABASE_JWT_SECRET environmental variable');
@@ -73,6 +77,8 @@ function createRedirectResponseFunction(res: Response, endpoint: string, public_
     };
 }
 
+
+
 function arrayIsEqual(a: any[], b: any[]): boolean {
     if (a === b) return true;
     if (a == null || b == null) return false;
@@ -86,6 +92,38 @@ function arrayIsEqual(a: any[], b: any[]): boolean {
     }
 
     return true;
+}
+
+function encryptToken(payload: string, algorithm: CipherGCMTypes, key: CipherKey): string {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv(algorithm, key, iv);
+
+    const encrypted = Buffer.concat([
+        cipher.update(payload, 'utf-8'),
+        cipher.final()
+    ]);
+
+    const authTag = cipher.getAuthTag(); // 16 bytes
+
+    return Buffer.concat([iv, authTag, encrypted]).toString('base64');
+}
+
+function decryptToken(encryptedString: string, algorithm: CipherGCMTypes, key: CipherKey): string {
+    const data = Buffer.from(encryptedString, 'base64');
+
+    const iv = data.subarray(0, 12);
+    const authTag = data.subarray(12, 28);
+    const encrypted = data.subarray(28);
+
+    const decipher = createDecipheriv(algorithm, key, iv);
+    decipher.setAuthTag(authTag);
+
+    const decrypted = Buffer.concat([
+        decipher.update(encrypted),
+        decipher.final()
+    ]);
+
+    return decrypted.toString('utf-8');
 }
 
 type SafelyResultSuccess<T> = { data: T, error: undefined };
@@ -157,7 +195,7 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
         {
             user_id,
             provider,
-            token: refresh_token,
+            token: encryptToken(refresh_token, aonyxengine_secret_algorithm, aonyxengine_secret_key),
             token_type: 'refresh_token',
             purpose,
             expires_at: new Date(Date.now() + (expires_in * 1000)).toISOString(),
