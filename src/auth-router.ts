@@ -35,7 +35,7 @@ const provider_map = {
         redirect_uri: process.env.DISCORD_REDIRECT_URL,
         scopes: [],
     }
-} satisfies Record<string, {
+} as Record<string, {
     code_endpoint: string,
     token_endpoint: string,
     client_id: string,
@@ -126,8 +126,9 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
     if (states_error) return fail('sb-states-error', states_error);
 
     const { user_id, provider, purpose } = states_data;
+    const provider_data = provider_map[provider as string];
 
-    if (!provider_map[provider]) return fail('provider-error', provider);
+    if (!provider_data) return fail('provider-error', provider);
 
     const { data: token_req_data, error: token_req_error } = await safelyRunAsync(() => fetch(
         provider_data.token_endpoint, {
@@ -136,11 +137,11 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
             'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: new URLSearchParams({
-            client_id: provider_map[provider].client_id,
-            client_secret: provider_map[provider].client_secret,
+            client_id: provider_data.client_id,
+            client_secret: provider_data.client_secret,
             code: code.toString(),
             grant_type: 'authorization_code',
-            redirect_uri: provider_map[provider].redirect_uri
+            redirect_uri: provider_data.redirect_uri
         }).toString()
     }
     ).then(response => response.json()));
