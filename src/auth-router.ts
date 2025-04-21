@@ -153,7 +153,7 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
 
     if (!arrayIsEqual(scope.toString().split(' ') ?? [], token_scope)) return fail('mismatch-scope', scope.toString().split(' '), token_scope);
 
-    const { error: token_error } = await supabase.from('oauth_tokens').insert([
+    const { error: token_error } = await supabase.from('oauth_tokens').upsert(
         {
             user_id,
             provider,
@@ -163,12 +163,11 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
             expires_at: new Date(Date.now() + (expires_in * 1000)).toISOString(),
             metadata: { scope }
         }
-    ]);
+        , { onConflict: 'user_id, purpose' })
 
-    if (token_error) return fail('sb-token-error');
+    if (token_error) return fail('sb-token-error', token_error);
 
-    res.status(200).send(redirectHTML('authentication successful!', 5));
-    console.log(`[${Date.now().toString()}] /auth/v1/callback successful login by ${user_id}`);
+    return success(`login by ${user_id}`);
 });
 
 
