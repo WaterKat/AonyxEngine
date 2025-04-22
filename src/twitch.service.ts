@@ -2,9 +2,9 @@ import WebSocket from "ws";
 import { Router } from "express";
 import 'dotenv/config';
 
-const twitch_event_wss = process.env.TWITCH_EVENT_WSS
+const twitchEventWSS = process.env.TWITCH_EVENT_WSS
 
-const provider_map = {
+const providerMap = {
     twitch: {
         subscription_endpoint: 'https://api.twitch.tv/helix/eventsub/subscriptions'
     }
@@ -12,7 +12,7 @@ const provider_map = {
 
 //MARK: SUBSCRIPTIONS
 //TODO subscription function after successful websocket connection
-function subscribeChatbots(token: string, client_id: string) {
+function subscribeChatBots(token: string, client_id: string) {
     const header = {
         "Authorization": token,
         "Client-Id": client_id,
@@ -35,8 +35,8 @@ function subscribeChatbots(token: string, client_id: string) {
 }
 
 //MARK: WEBSOCKETS
-export const twitchWebSocket = new WebSocket(twitch_event_wss);
-const twitch_session_data = {
+export const twitchWebSocket = new WebSocket(twitchEventWSS);
+const twitchSessionData = {
     "id": "",
     "status": "",
     "connected_at": "",
@@ -62,9 +62,9 @@ twitchWebSocket.on('message', (raw_data) => {
     switch (data.metadata.message_type) {
         case 'session_welcome':
             console.log(`[${Date.now()}] twitchWS: session_welcome received`);
-            for (const key in twitch_session_data) {
+            for (const key in twitchSessionData) {
                 if (Object.prototype.hasOwnProperty.call(data.payload, key)) {
-                    twitch_session_data[key] = data.payload[key];
+                    twitchSessionData[key] = data.payload[key];
                 }
             }
             //TODO ADD SUBSCRIPTION CALL AFTER WELCOME MESSAGE

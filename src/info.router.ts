@@ -2,22 +2,22 @@ import { Router } from "express";
 import ApplicationInfoJson from "./version.json" with { type: "json"};
 
 
-const statusRouter = Router();
+const infoRouter = Router();
 
 
-statusRouter.get("/", (req, res) => {
+infoRouter.get("/", (req, res) => {
   res.status(200).send(`hello world from ${ApplicationInfoJson.application}!`);
 });
 
 
-statusRouter.get("/version", (req, res) => {
+infoRouter.get("/version", (req, res) => {
   res.status(200).json(ApplicationInfoJson);
 });
 
 
-statusRouter.get("/health", (req, res) => {
+infoRouter.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", timeStamp: Date.now() });
 });
 
 
-export default statusRouter;
+export default infoRouter;

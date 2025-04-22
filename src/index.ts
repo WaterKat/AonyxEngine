@@ -1,9 +1,10 @@
 import express from "express";
 import 'dotenv/config';
 
-import statusRouter from "./utils-router.js";
-import { authRouter } from "./auth-router.js";
+import infoRouter from "./info.router.js";
+import { authRouter } from "./auth.router.js";
 import ApplicationInfoJson from "./version.json" with { type: "json"};
+//import "./twitch.service.js";
 
 //MARK:SETUP
 if (process.env.NODE_ENV === "development")
@@ -22,7 +23,7 @@ const router = express.Router();
 
 //MARK:ROUTERS
 app.use('/api/v1', router);
-app.use(statusRouter);
+app.use(infoRouter);
 app.use(authRouter);
 
 

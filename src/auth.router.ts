@@ -1,20 +1,21 @@
 import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { type CipherGCMTypes, type CipherKey, createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { randomBytes } from 'crypto';
 import 'dotenv/config';
 import { type Response } from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
+import { arrayIsEqual, encryptToken, safelyRun, safelyRunAsync } from './utils.js';
 
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-const supabase_jwt_secret = process.env.SUPABASE_JWT_SECRET;
+const supabaseJWTSecret = process.env.SUPABASE_JWT_SECRET;
 
-const aonyxengine_secret_algorithm = 'aes-256-gcm';
-const aonyxengine_secret_key = process.env.AONYXENGINE_SECRET_KEY
+const aonyxengineSecretAlgorithm = 'aes-256-gcm';
+const aonyxEngineSecretKey = process.env.AONYXENGINE_SECRET_KEY
 
 
-if (supabase_jwt_secret === "" || !supabase_jwt_secret) {
+if (supabaseJWTSecret === "" || !supabaseJWTSecret) {
     console.error('Please set the SUPABASE_JWT_SECRET environmental variable');
 }
 
@@ -22,7 +23,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     db: { schema: 'private' }
 })
 
-const provider_map = {
+const PROVIDER_MAP = {
     twitch: {
         code_endpoint: process.env.TWITCH_CODE_ENDPOINT ?? 'https://id.twitch.tv/oauth2/authorize',
         token_endpoint: process.env.TWITCH_TOKEN_ENDPOINT ?? 'https://id.twitch.tv/oauth2/token',
@@ -78,74 +79,6 @@ function createRedirectResponseFunction(res: Response, endpoint: string, public_
 }
 
 
-
-function arrayIsEqual(a: any[], b: any[]): boolean {
-    if (a === b) return true;
-    if (a == null || b == null) return false;
-    if (a.length !== b.length) return false;
-
-    const c = Array.from(a).sort();
-    const d = Array.from(b).sort();
-
-    for (let i = 0; i < c.length; i++) {
-        if (c[i] !== d[i]) return false;
-    }
-
-    return true;
-}
-
-function encryptToken(payload: string, algorithm: CipherGCMTypes, key: CipherKey): string {
-    const iv = randomBytes(12);
-    const cipher = createCipheriv(algorithm, key, iv);
-
-    const encrypted = Buffer.concat([
-        cipher.update(payload, 'utf-8'),
-        cipher.final()
-    ]);
-
-    const authTag = cipher.getAuthTag(); // 16 bytes
-
-    return Buffer.concat([iv, authTag, encrypted]).toString('base64');
-}
-
-function decryptToken(encryptedString: string, algorithm: CipherGCMTypes, key: CipherKey): string {
-    const data = Buffer.from(encryptedString, 'base64');
-
-    const iv = data.subarray(0, 12);
-    const authTag = data.subarray(12, 28);
-    const encrypted = data.subarray(28);
-
-    const decipher = createDecipheriv(algorithm, key, iv);
-    decipher.setAuthTag(authTag);
-
-    const decrypted = Buffer.concat([
-        decipher.update(encrypted),
-        decipher.final()
-    ]);
-
-    return decrypted.toString('utf-8');
-}
-
-type SafelyResultSuccess<T> = { data: T, error: undefined };
-type SafelyResultFailure = { data: undefined, error: Error; }
-type SafelyResult<T> = SafelyResultSuccess<T> | SafelyResultFailure;
-
-function safelyRun<K extends (...args: any[]) => any>(func: K, ...args: Parameters<K>): SafelyResult<ReturnType<K>> {
-    try {
-        return { data: func(...args), error: undefined };
-    } catch (e) {
-        return { data: undefined, error: e instanceof Error ? e : new Error(String(e)) };
-    }
-};
-
-async function safelyRunAsync<K extends (...args: any[]) => Promise<any>>(func: K, ...args: Parameters<K>): Promise<SafelyResult<Awaited<ReturnType<K>>>> {
-    try {
-        return { data: await func(...args), error: undefined };
-    } catch (e) {
-        return { data: undefined, error: e instanceof Error ? e : new Error(String(e)) };
-    }
-};
-
 //MARK: DATABASE
 const authRouter = Router();
 
@@ -164,7 +97,7 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
     if (states_error) return fail('sb-states-error', states_error);
 
     const { user_id, provider, purpose } = states_data;
-    const provider_data = provider_map[provider as string];
+    const provider_data = PROVIDER_MAP[provider as string];
 
     if (!provider_data) return fail('provider-error', provider);
 
@@ -195,7 +128,7 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
         {
             user_id,
             provider,
-            token: encryptToken(refresh_token, aonyxengine_secret_algorithm, aonyxengine_secret_key),
+            token: encryptToken(refresh_token, aonyxengineSecretAlgorithm, aonyxEngineSecretKey),
             token_type: 'refresh_token',
             purpose,
             expires_at: new Date(Date.now() + (expires_in * 1000)).toISOString(),
@@ -282,7 +215,7 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
     const force_verify = req.query['force_verify']?.toString() ?? 'false';
     const state = randomBytes(16).toString('hex')
 
-    const { code_endpoint, client_id, redirect_uri, scopes } = provider_map['twitch'];
+    const { code_endpoint, client_id, redirect_uri, scopes } = PROVIDER_MAP['twitch'];
 
     const search_params = new URLSearchParams({
         client_id,
