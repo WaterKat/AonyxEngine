@@ -10,9 +10,9 @@ import { arrayIsEqual, encryptToken, safelyRun, safelyRunAsync, requireEnvAs, is
 const supabaseUrl = requireEnvAs('string', 'SUPABASE_URL');
 const supabaseKey = requireEnvAs('string', 'SUPABASE_SERVICE_KEY');
 
-const supabaseJWTSecret = isDev() ? requireEnvAs('string', 'SUPABASE_JWT_SECRET') : '';
-const supabaseMockUserId = isDev() ? requireEnvAs('string', 'SUPABASE_MOCK_USER_ID') : '';
-const supabaseMockUserEmail = isDev() ? requireEnvAs('string', 'SUPABASE_MOCK_USER_EMAIL') : '';
+const supabaseJWTSecret = isDev() ? requireEnvAs('string', 'SUPABASE_JWT_SECRET', 'dev_jwt_secret') : '';
+const supabaseMockUserId = isDev() ? requireEnvAs('string', 'SUPABASE_MOCK_USER_ID', 'dev_mock_user_id') : '';
+const supabaseMockUserEmail = isDev() ? requireEnvAs('string', 'SUPABASE_MOCK_USER_EMAIL', 'dev_mock_user_email') : '';
 
 const aonyxengineSecretAlgorithm = 'aes-256-gcm';
 const aonyxEngineSecretKey = requireEnvAs('string', 'AONYXENGINE_SECRET_KEY');

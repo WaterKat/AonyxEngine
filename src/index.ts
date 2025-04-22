@@ -1,14 +1,20 @@
-import express from "express";
 import 'dotenv/config';
+import express from "express";
 
 import infoRouter from "./info.router.js";
 import { authRouter } from "./auth.router.js";
 import ApplicationInfoJson from "./version.json" with { type: "json"};
-//import "./twitch.service.js";
+import { getRequiredEnvKeys, isDev } from './utils.js';
+// import "./twitch.service.js";
 
 //MARK:SETUP
-if (process.env.NODE_ENV === "development")
+if (isDev())
+{
   console.warn(`[${new Date().toISOString()}] ${ApplicationInfoJson.application.toUpperCase()} is running in DEVELOPMENT mode`);
+  setTimeout(() => {
+    console.warn(`[${new Date().toISOString()}] ${ApplicationInfoJson.application.toUpperCase()} requires following environment variables:\n${getRequiredEnvKeys().join('=\n')}=\n`);
+  }, 1000);
+}
 
 
 //vars

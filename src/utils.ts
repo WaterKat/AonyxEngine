@@ -2,10 +2,18 @@ import { type CipherGCMTypes, type CipherKey, randomBytes, createCipheriv, creat
 
 
 // MARK: ENVIRONMENT
+const requiredEnvKeys = [];
 export function requireEnvAs<K extends keyof typeof process.env>(type: 'string', key: K, fallback?: string): string;
 export function requireEnvAs<K extends keyof typeof process.env>(type: 'number', key: K, fallback?: number): number;
 export function requireEnvAs<K extends keyof typeof process.env>(type: 'boolean', key: K, fallback?: boolean): boolean;
 export function requireEnvAs<K extends keyof typeof process.env>(type: 'string' | 'number' | 'boolean', key: K, fallback?: string | number | boolean): string | number | boolean {
+    // Only add to requiredEnvKeys if we're in dev
+    if (isDev() && fallback === undefined) {
+        if (!requiredEnvKeys.includes(key)) {
+            requiredEnvKeys.push(key);
+        }
+    }
+
     const raw = process.env[key];
     const value = raw?.trim();
 
@@ -42,6 +50,14 @@ export function requireEnvAs<K extends keyof typeof process.env>(type: 'string' 
             throw new Error(`Unknown type "${type}" for environmental variable: "${key}".`);
     }
 }
+export function getRequiredEnvKeys(): string[] {
+    if (isDev()) {
+        return requiredEnvKeys;
+    }
+    return [];
+}
+
+
 export function isDev(): boolean {
     return process.env.NODE_ENV === 'development';
 }
