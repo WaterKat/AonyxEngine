@@ -4,20 +4,18 @@ import { randomBytes } from 'crypto';
 import 'dotenv/config';
 import { type Response } from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
-import { arrayIsEqual, encryptToken, safelyRun, safelyRunAsync } from './utils.js';
+import { arrayIsEqual, encryptToken, safelyRun, safelyRunAsync, requireEnvAs, isDev } from './utils.js';
 
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-const supabaseJWTSecret = process.env.SUPABASE_JWT_SECRET;
+const supabaseUrl = requireEnvAs('string', 'SUPABASE_URL');
+const supabaseKey = requireEnvAs('string', 'SUPABASE_SERVICE_KEY');
+
+const supabaseJWTSecret = isDev() ? requireEnvAs('string', 'SUPABASE_JWT_SECRET') : '';
+const supabaseMockUserId = isDev() ? requireEnvAs('string', 'SUPABASE_MOCK_USER_ID') : '';
+const supabaseMockUserEmail = isDev() ? requireEnvAs('string', 'SUPABASE_MOCK_USER_EMAIL') : '';
 
 const aonyxengineSecretAlgorithm = 'aes-256-gcm';
-const aonyxEngineSecretKey = process.env.AONYXENGINE_SECRET_KEY
-
-
-if (supabaseJWTSecret === "" || !supabaseJWTSecret) {
-    console.error('Please set the SUPABASE_JWT_SECRET environmental variable');
-}
+const aonyxEngineSecretKey = requireEnvAs('string', 'AONYXENGINE_SECRET_KEY');
 
 const supabase = createClient(supabaseUrl, supabaseKey, {
     db: { schema: 'private' }
@@ -25,19 +23,19 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 
 const PROVIDER_MAP = {
     twitch: {
-        code_endpoint: process.env.TWITCH_CODE_ENDPOINT ?? 'https://id.twitch.tv/oauth2/authorize',
-        token_endpoint: process.env.TWITCH_TOKEN_ENDPOINT ?? 'https://id.twitch.tv/oauth2/token',
-        client_id: process.env.TWITCH_CLIENT_ID,
-        client_secret: process.env.TWITCH_CLIENT_SECRET,
-        redirect_uri: process.env.TWITCH_REDIRECT_URL,
+        code_endpoint: requireEnvAs('string', 'TWITCH_CODE_ENDPOINT', 'https://id.twitch.tv/oauth2/authorize'),
+        token_endpoint: requireEnvAs('string', 'TWITCH_TOKEN_ENDPOINT', 'https://id.twitch.tv/oauth2/token'),
+        client_id: requireEnvAs('string', 'TWITCH_CLIENT_ID'),
+        client_secret: requireEnvAs('string', 'TWITCH_CLIENT_SECRET'),
+        redirect_uri: requireEnvAs('string', 'TWITCH_REDIRECT_URL'),
         scopes: ['user:read:chat'],
     },
     discord: {
-        code_endpoint: process.env.DISCORD_CODE_ENDPOINT ?? 'https://discord.com/api/oauth2/authorize',
-        token_endpoint: process.env.DISCORD_TOKEN_ENDPOINT ?? 'https://discord.com/api/oauth2/token',
-        client_id: process.env.DISCORD_CLIENT_ID,
-        client_secret: process.env.DISCORD_CLIENT_SECRET,
-        redirect_uri: process.env.DISCORD_REDIRECT_URL,
+        code_endpoint: requireEnvAs('string', 'DISCORD_CODE_ENDPOINT', 'https://discord.com/api/oauth2/authorize'),
+        token_endpoint: requireEnvAs('string', 'DISCORD_TOKEN_ENDPOINT', 'https://discord.com/api/oauth2/token'),
+        client_id: requireEnvAs('string', 'DISCORD_CLIENT_ID'),
+        client_secret: requireEnvAs('string', 'DISCORD_CLIENT_SECRET'),
+        redirect_uri: requireEnvAs('string', 'DISCORD_REDIRECT_URL'),
         scopes: [],
     }
 } as Record<string, {
@@ -180,11 +178,11 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
 
     let provided_token = req.header["Authorization"];
 
-    if (process.env.NODE_ENV === "development" && (!provided_token || provided_token === "")) {
+    if (isDev() && (!provided_token || provided_token === "")) {
         console.warn(`[${new Date().toISOString()}] Token not provided. DEVELOPMENT MODE using MOCK USER`);
         const { data: mock_token, error: mock_token_error } = safelyRun(() => jwt.sign({
-            sub: process.env.SUPABASE_MOCK_USER_ID,
-            email: process.env.SUPABASE_MOCK_EMAIL,
+            sub: supabaseMockUserId,
+            email: supabaseMockUserEmail,
             role: 'authenticated',
             exp: Math.floor(Date.now() / 1000) + 60 * 60,
             aud: "authenticated",
@@ -195,7 +193,7 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
             user_metadata: {
                 full_name: "AonyxEngine"
             }
-        }, process.env.SUPABASE_JWT_SECRET, { algorithm: 'HS256' }));
+        }, supabaseJWTSecret, { algorithm: 'HS256' }));
         if (mock_token_error) {
             console.error(`[${new Date().toISOString()}] /auth/v1/twitch/token DEVELOPMENT MODE`, mock_token_error);
         } else {
