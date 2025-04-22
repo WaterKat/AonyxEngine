@@ -3,17 +3,47 @@ import { Router } from "express";
 import 'dotenv/config';
 
 const twitch_event_wss = process.env.TWITCH_EVENT_WSS
-const twitch_sub_url = process.env.TWITCH_SUBSCRIPTION_URL;
-const twitch_client_id = process.env.TWITCH_CLIENT_ID;
-const twitch_auth_code_url = process.env.TWITCH_AUTH_CODE_URL;
-const twitch_auth_redirect_uri = process.env.TWITCH_AUTH_REDIRECT_URI;
 
+const provider_map = {
+    twitch: {
+        subscription_endpoint: 'https://api.twitch.tv/helix/eventsub/subscriptions'
+    }
+}
 
 //MARK: SUBSCRIPTIONS
 //TODO subscription function after successful websocket connection
+function subscribeChatbots(token: string, client_id: string) {
+    const header = {
+        "Authorization": token,
+        "Client-Id": client_id,
+        "Content-Type": "application/json"
+    }
+    const body = {
+        "type": "channel.follow",
+        "version": "2",
+        "condition": {
+            "broadcaster_user_id": "1234",
+            "moderator_user_id": "1234"
+        },
+        "transport": {
+            "method": "webhook",
+            "callback": "https://example.com/callback",
+            "secret": "s3cre77890ab"
+        }
+    }
+    //TODO ADD POST REQUEST FOR SUBSCRIPTION
+}
 
 //MARK: WEBSOCKETS
 export const twitchWebSocket = new WebSocket(twitch_event_wss);
+const twitch_session_data = {
+    "id": "",
+    "status": "",
+    "connected_at": "",
+    "keepalive_timeout_seconds": 0,
+    "reconnect_url": "",
+    "recovery_url": ""
+};
 
 twitchWebSocket.on('open', () => {
     console.log(`[${Date.now()}] twitchWS: connected`);
@@ -27,13 +57,17 @@ twitchWebSocket.on('close', () => {
     console.log(`[${Date.now()}] twitchWS: disconnected`);
 });
 
-twitchWebSocket.on('message', (rawData) => {
-    const data = JSON.parse(rawData.toString());
-
-
+twitchWebSocket.on('message', (raw_data) => {
+    const data = JSON.parse(raw_data.toString());
     switch (data.metadata.message_type) {
         case 'session_welcome':
-            console.log(`[${Date.now()}] twitchWS: session_welcome ${JSON.stringify(data.payload, null, 2)}`)
+            console.log(`[${Date.now()}] twitchWS: session_welcome received`);
+            for (const key in twitch_session_data) {
+                if (Object.prototype.hasOwnProperty.call(data.payload, key)) {
+                    twitch_session_data[key] = data.payload[key];
+                }
+            }
+            //TODO ADD SUBSCRIPTION CALL AFTER WELCOME MESSAGE
             break;
         case 'notification':
             console.log(`[${Date.now()}] twitchWS: notification ${JSON.stringify(data.payload, null, 2)}`)
