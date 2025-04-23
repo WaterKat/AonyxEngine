@@ -1,14 +1,11 @@
-import { Router } from 'express';
-import { createClient } from '@supabase/supabase-js';
-import { randomBytes } from 'crypto';
 import 'dotenv/config';
+import { Router } from 'express';
+import { randomBytes } from 'crypto';
 import { type Response } from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
-import { arrayIsEqual, encryptToken, safelyRun, safelyRunAsync, requireEnvAs, isDev } from './utils.js';
+import { arrayIsEqual, encryptToken, safelyRun, safelyRunAsync, requireEnvAs, isDev } from './lib/utils.js';
+import { supabase } from './lib/supabaseClient.js';
 
-
-const supabaseUrl = requireEnvAs('string', 'SUPABASE_URL');
-const supabaseKey = requireEnvAs('string', 'SUPABASE_SERVICE_KEY');
 
 const supabaseJWTSecret = isDev() ? requireEnvAs('string', 'SUPABASE_JWT_SECRET', 'dev_jwt_secret') : '';
 const supabaseMockUserId = isDev() ? requireEnvAs('string', 'SUPABASE_MOCK_USER_ID', 'dev_mock_user_id') : '';
@@ -16,10 +13,6 @@ const supabaseMockUserEmail = isDev() ? requireEnvAs('string', 'SUPABASE_MOCK_US
 
 const aonyxengineSecretAlgorithm = 'aes-256-gcm';
 const aonyxEngineSecretKey = requireEnvAs('string', 'AONYXENGINE_SECRET_KEY');
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-    db: { schema: 'private' }
-})
 
 const PROVIDER_MAP = {
     twitch: {

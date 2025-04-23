@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { Router } from "express";
 import 'dotenv/config';
-import { safelyRunAsync } from "./utils.js";
+import { safelyRunAsync } from "./lib/utils.js";
 
 const twitchEventWSS = process.env.TWITCH_EVENT_WSS
 
@@ -174,6 +174,7 @@ twitchWebSocket.on('message', (raw_data) => {
                     twitchSessionData[key] = data.payload[key];
                 }
             }
+
             //TODO ADD SUBSCRIPTION CALL AFTER WELCOME MESSAGE
             break;
         case 'notification':

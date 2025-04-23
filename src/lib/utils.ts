@@ -62,6 +62,44 @@ export function isDev(): boolean {
     return process.env.NODE_ENV === 'development';
 }
 
+// MARK: DICTIONARY
+import { readFileSync, writeFileSync } from 'fs';
+const aonyxEngineSecretKey = requireEnvAs('string', 'AONYXENGINE_SECRET_KEY');
+class DataFile {
+    data: Record<string, string> = {};
+    writeTimeout: number = 3000;
+    lastWrite: number = Date.now();
+    filePath: string = '';
+    encrypt: boolean = false;
+    constructor(filePath: string = 'aonyxengine.json', encrypt: boolean = false) {
+        this.filePath = filePath;
+        this.encrypt = encrypt;
+        const data = readFileSync(filePath, 'utf-8');
+        if (encrypt) {
+            this.data = JSON.parse(decryptToken(data, 'aes-256-gcm', aonyxEngineSecretKey));
+        } else {
+            this.data = JSON.parse(data);
+        }
+    }
+    async get(key: string) {
+        return this.data[key] ?? '';
+    }
+    set(key: string, value: string) {
+        this.data[key] = value;
+        if (Date.now() - this.lastWrite > this.writeTimeout) {
+            if (this.encrypt) {
+                writeFileSync(this.filePath, encryptToken(JSON.stringify(this.data), 'aes-256-gcm', aonyxEngineSecretKey), 'utf-8');
+            } else {
+                writeFileSync(this.filePath, JSON.stringify(this.data), 'utf-8');
+            }
+            this.writeTimeout = Date.now();
+        }
+    }
+}
+export async function createClient(): Promise<DataFile> {
+    return new DataFile();
+}
+
 // MARK: SAFELY
 type SafelyResultSuccess<T> = { data: T; error: undefined; };
 type SafelyResultFailure = { data: undefined; error: Error; };
