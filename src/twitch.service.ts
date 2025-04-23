@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import { Router } from "express";
 import 'dotenv/config';
+import { safelyRunAsync } from "./utils.js";
 
 const twitchEventWSS = process.env.TWITCH_EVENT_WSS
 
@@ -12,25 +13,131 @@ const providerMap = {
 
 //MARK: SUBSCRIPTIONS
 //TODO subscription function after successful websocket connection
-function subscribeChatBots(token: string, client_id: string) {
+type TwitchTransportWebSocket = {
+    method: "websocket",
+    session_id: string,
+    connected_at?: string,
+    disconnected_at?: string
+}
+type TwitchTransportWebHook = {
+    method: "webhook",
+    callback: string,
+    secret: string,
+}
+type TwitchTransport = TwitchTransportWebHook | TwitchTransportWebSocket;
+
+/** required scopes 'user:read:chat' */
+type TwitchEventSubChannelChatMessage = {
+    type: "channel.chat.message",
+    version: "1",
+    condition: {
+        broadcaster_user_id: string,
+        user_id: string,
+    }
+    transport: TwitchTransport
+}
+
+/** required scopes 'moderator:read:followers' */
+type TwitchEventSubChannelFollow = {
+    type: "channel.follow",
+    version: "2",
+    condition: {
+        broadcaster_user_id: string,
+        moderator_user_id: string,
+    }
+    transport: TwitchTransport
+}
+
+/** required scopes 'channel:read:subscriptions' */
+type TwitchEventSubChannelSubscribe = {
+    type: "channel.subscribe",
+    version: "1",
+    condition: {
+        broadcaster_user_id: string,
+    }
+    transport: TwitchTransport
+}
+
+/** required scopes 'bits:read' */
+type TwitchEventSubChannelCheer = {
+    type: "channel.cheer",
+    version: "1",
+    condition: {
+        broadcaster_user_id: string,
+    }
+    transport: TwitchTransport
+}
+
+/** required scopes NONE */
+type TwitchEventSubChannelRaid = {
+    type: "channel.raid",
+    version: "1",
+    condition: {
+        to_broadcaster_user_id: string,
+    }
+    transport: TwitchTransport
+}
+
+/** required scopes 'channel:read:polls' */
+type TwitchEventSubChannelPollBegin = {
+    type: "channel.poll.begin",
+    version: "1",
+    condition: {
+        broadcaster_user_id: string,
+    }
+    transport: TwitchTransport
+}
+
+/** required scopes 'channel:read:polls' */
+type TwitchEventSubChannelPollEnd = {
+    type: "channel.poll.end",
+    version: "1",
+    condition: {
+        broadcaster_user_id: string,
+    }
+    transport: TwitchTransport
+}
+
+/** required scopes 'channel:read:redemptions' */
+type TwitchEventSubChannelAutomaticRedemption = {
+    type: "channel.channel_points_automatic_reward_redemption.add",
+    version: "1",
+    condition: {
+        broadcaster_user_id: string,
+    }
+    transport: TwitchTransport
+}
+
+/** required scopes 'channel:read:redemptions' */
+type TwitchEventSubChannelCustomRedemption = {
+    type: "channel.channel_points_custom_reward_redemption.add",
+    version: "1",
+    condition: {
+        broadcaster_user_id: string,
+        reward_id?: string,
+    }
+    transport: TwitchTransport
+}
+
+type TwitchEventSub =
+    | TwitchEventSubChannelChatMessage
+    | TwitchEventSubChannelFollow
+    | TwitchEventSubChannelSubscribe
+    | TwitchEventSubChannelCheer
+    | TwitchEventSubChannelRaid
+    | TwitchEventSubChannelPollBegin
+    | TwitchEventSubChannelPollEnd
+    | TwitchEventSubChannelAutomaticRedemption
+    | TwitchEventSubChannelCustomRedemption;
+
+async function subscribeEventSub(token: string, client_id: string, twitchEventSub: TwitchEventSub) {
     const header = {
         "Authorization": token,
         "Client-Id": client_id,
         "Content-Type": "application/json"
     }
-    const body = {
-        "type": "channel.follow",
-        "version": "2",
-        "condition": {
-            "broadcaster_user_id": "1234",
-            "moderator_user_id": "1234"
-        },
-        "transport": {
-            "method": "webhook",
-            "callback": "https://example.com/callback",
-            "secret": "s3cre77890ab"
-        }
-    }
+    const body = twitchEventSub;
+    const { data, error } = await safelyRunAsync(() => fetch(providerMap.twitch.subscription_endpoint, { method: 'POST', headers: header, body: JSON.stringify(body) }));
     //TODO ADD POST REQUEST FOR SUBSCRIPTION
 }
 
