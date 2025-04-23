@@ -28,7 +28,17 @@ const PROVIDER_MAP = {
         client_id: requireEnvAs('string', 'TWITCH_CLIENT_ID'),
         client_secret: requireEnvAs('string', 'TWITCH_CLIENT_SECRET'),
         redirect_uri: requireEnvAs('string', 'TWITCH_REDIRECT_URL'),
-        scopes: ['user:read:chat'],
+        scopes: [
+            'user:read:chat',
+            'moderator:read:followers',
+            'channel:read:subscriptions',
+            'bits:read',
+            'channel:read:polls',
+            'channel:read:charity',
+            'channel:read:goals',
+            'channel:read:hype_train',
+            'channel:read:redemptions'
+        ],
     },
     discord: {
         code_endpoint: requireEnvAs('string', 'DISCORD_CODE_ENDPOINT', 'https://discord.com/api/oauth2/authorize'),
@@ -203,11 +213,14 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
 
     const { data: user_data, error: sb_user_error } = await supabase.auth.getUser(provided_token);
     const { user } = user_data;
+    const twitch_identity = user?.identities?.find(identity => identity.provider === 'twitch');
 
-    if (!user || sb_user_error) {
+    if (!user || sb_user_error || !twitch_identity) {
         console.log('anon redirected to login', sb_user_error);
         return res.redirect('/auth/v1/twitch/login');
     }
+
+    console.log('user identities', user.identities);
 
     const timeout_in_minutes = 5;
     const force_verify = req.query['force_verify']?.toString() ?? 'false';
