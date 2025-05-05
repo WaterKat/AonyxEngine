@@ -3,8 +3,7 @@ import { Router } from 'express';
 import { randomBytes } from 'crypto';
 import { type Response } from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
-import { arrayIsEqual, encryptToken, safelyRun, safelyRunAsync, requireEnvAs, isDev } from './lib/utils.js';
-import { supabase } from './lib/supabaseClient.js';
+import { requireEnvAs } from './lib/requireEnvAs.utils.js';
 
 
 const supabaseJWTSecret = isDev() ? requireEnvAs('string', 'SUPABASE_JWT_SECRET', 'dev_jwt_secret') : '';
