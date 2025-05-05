@@ -3,8 +3,10 @@ import { Router } from 'express';
 import { randomBytes } from 'crypto';
 import { type Response } from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
+import { arrayIsEqual, encryptToken, isDev } from './lib/utils.js';
 import { safelyRun, safelyRunAsync } from './lib/safely.utils.js';
 import { requireEnvAs } from './lib/requireEnvAs.utils.js';
+import { supabasePrivate } from './lib/supabaseClient.js';
 
 
 const supabaseJWTSecret = isDev() ? requireEnvAs('string', 'SUPABASE_JWT_SECRET', 'dev_jwt_secret') : '';
@@ -93,7 +95,7 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
 
     if (error || !code) return fail('code-error', { error, error_description });
 
-    const { data: states_data, error: states_error } = await supabase.from('oauth_states').select('*').eq('state', state).gt('expires_at', new Date().toISOString()).single();
+    const { data: states_data, error: states_error } = await supabasePrivate.from('oauth_states').select('*').eq('state', state).gt('expires_at', new Date().toISOString()).single();
 
     if (states_error) return fail('sb-states-error', states_error);
 
@@ -125,7 +127,7 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
 
     if (!arrayIsEqual(scope.toString().split(' ') ?? [], token_scope)) return fail('mismatch-scope', scope.toString().split(' '), token_scope);
 
-    const { error: token_error } = await supabase.from('oauth_tokens').upsert(
+    const { error: token_error } = await supabasePrivate.from('oauth_tokens').upsert(
         {
             user_id,
             provider,
@@ -145,7 +147,7 @@ authRouter.get('/auth/v1/callback', async (req, res): Promise<any> => {
 
 //MARK: DISCORD
 authRouter.get('/auth/v1/discord/login', async (req, res) => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabasePrivate.auth.signInWithOAuth({
         provider: 'discord',
 
     })
@@ -162,7 +164,7 @@ authRouter.get('/auth/v1/discord/login', async (req, res) => {
 
 //MARK: TWITCH
 authRouter.get('/auth/v1/twitch/login', async (req, res) => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabasePrivate.auth.signInWithOAuth({
         provider: 'twitch',
 
     })
@@ -204,7 +206,7 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
         }
     }
 
-    const { data: user_data, error: sb_user_error } = await supabase.auth.getUser(provided_token);
+    const { data: user_data, error: sb_user_error } = await supabasePrivate.auth.getUser(provided_token);
     const { user } = user_data;
     const twitch_identity = user?.identities?.find(identity => identity.provider === 'twitch');
 
@@ -232,7 +234,7 @@ authRouter.get('/auth/v1/twitch/token', async (req, res): Promise<any> => {
 
     const code_request_url = code_endpoint + '?' + search_params;
 
-    const { error } = await supabase.from('oauth_states').insert([{
+    const { error } = await supabasePrivate.from('oauth_states').insert([{
         user_id: user.id,
         state: state,
         provider: 'twitch',
