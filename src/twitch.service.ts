@@ -1,7 +1,8 @@
 import WebSocket from "ws";
 import { Router } from "express";
 import 'dotenv/config';
-import { safelyRunAsync } from "./lib/utils.js";
+import { safelyThrowError, type SafelyResult, safelyRunAsync, safelyWrapError } from './lib/safely.utils.js';
+import { supabasePublic } from "./lib/supabaseClient.js";
 
 const twitchEventWSS = process.env.TWITCH_EVENT_WSS
 

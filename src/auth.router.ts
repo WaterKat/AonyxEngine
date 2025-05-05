@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { randomBytes } from 'crypto';
 import { type Response } from 'express-serve-static-core';
 import jwt from 'jsonwebtoken';
+import { safelyRun, safelyRunAsync } from './lib/safely.utils.js';
 import { requireEnvAs } from './lib/requireEnvAs.utils.js';
 
 

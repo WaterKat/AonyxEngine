@@ -8,6 +8,7 @@ export function isDev(): boolean {
 // MARK: DICTIONARY
 import { readFileSync, writeFileSync } from 'fs';
 import { requireEnvAs } from './requireEnvAs.utils.js';
+import { safelyRun } from './safely.utils.js';
 const aonyxEngineSecretKey = requireEnvAs('string', 'AONYXENGINE_SECRET_KEY');
 class DataFile {
     data: Record<string, string> = {};
@@ -18,15 +19,15 @@ class DataFile {
     constructor(filePath: string = 'aonyxengine.json', encrypt: boolean = false) {
         this.filePath = filePath;
         this.encrypt = encrypt;
-        const { data, error } = safelyRun(() => readFileSync(filePath, 'utf-8'));
-        if (error) {
+        const read_file_request = safelyRun(() => readFileSync(filePath, 'utf-8'));
+        if (read_file_request.ok === false) {
             this.data = {};
             return;
         }
         if (encrypt) {
-            this.data = JSON.parse(decryptToken(data, 'aes-256-gcm', aonyxEngineSecretKey));
+            this.data = JSON.parse(decryptToken(read_file_request.data, 'aes-256-gcm', aonyxEngineSecretKey));
         } else {
-            this.data = JSON.parse(data);
+            this.data = JSON.parse(read_file_request.data);
         }
     }
     async get(key: string) {
@@ -47,28 +48,6 @@ class DataFile {
 export async function createClient(): Promise<DataFile> {
     return new DataFile();
 }
-
-// MARK: SAFELY
-type SafelyResultSuccess<T> = { data: T; error: undefined; };
-type SafelyResultFailure = { data: undefined; error: Error; };
-export type SafelyResult<T> = SafelyResultSuccess<T> | SafelyResultFailure;
-
-export function safelyRun<K extends (...args: any[]) => any>(func: K, ...args: Parameters<K>): SafelyResult<ReturnType<K>> {
-    try {
-        return { data: func(...args), error: undefined };
-    } catch (e) {
-        return { data: undefined, error: e instanceof Error ? e : new Error(String(e)) };
-    }
-}
-
-export async function safelyRunAsync<K extends (...args: any[]) => Promise<any>>(func: K, ...args: Parameters<K>): Promise<SafelyResult<Awaited<ReturnType<K>>>> {
-    try {
-        return { data: await func(...args), error: undefined };
-    } catch (e) {
-        return { data: undefined, error: e instanceof Error ? e : new Error(String(e)) };
-    }
-}
-
 
 // MARK: ENCRYPTION
 export function encryptToken(payload: string, algorithm: CipherGCMTypes, key: CipherKey): string {
