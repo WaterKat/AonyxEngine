@@ -4,7 +4,9 @@ import express from "express";
 import infoRouter from "./info.router.js";
 import { authRouter } from "./auth.router.js";
 import ApplicationInfoJson from "./version.json" with { type: "json"};
+import { isDev } from './lib/utils.js';
 import { getRequiredEnvKeys } from './lib/requireEnvAs.utils.js';
+import "./twitch.service.js";
 
 //MARK:SETUP
 if (isDev())
