@@ -27,7 +27,17 @@ export async function safelyUnwrapPromise<K>(promise: Promise<K>): Promise<Safel
 }
 
 export async function safelyWrapError(message: string, e: SafelyResultFailure | Error): Promise<SafelyResultFailure> {
-    return { ok: false, error: new Error(message, { cause: e instanceof Error ? e : e.error }) };
+    if (e instanceof Error) {
+        return { ok: false, error: new Error(message, { cause: e }) };
+    } else if (e.error instanceof Error) {
+        return { ok: false, error: new Error(message, { cause: e.error }) };
+    } else {
+        try {
+            return { ok: false, error: new Error(message, { cause: new Error(JSON.stringify(e, null, 2)) }) };
+        } catch {
+            return { ok: false, error: new Error(message, { cause: new Error(String(e)) }) };
+        }
+    }
 }
 
 export function safelyOK<K extends any>(data?: K): SafelyResult<K> {
