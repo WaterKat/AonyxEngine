@@ -46,6 +46,7 @@ export type Database = {
           id: number
           metadata: Json | null
           provider: string
+          provider_user_id: string
           purpose: string
           token: string
           token_type: string
@@ -57,6 +58,7 @@ export type Database = {
           id?: number
           metadata?: Json | null
           provider: string
+          provider_user_id: string
           purpose: string
           token: string
           token_type: string
@@ -68,6 +70,7 @@ export type Database = {
           id?: number
           metadata?: Json | null
           provider?: string
+          provider_user_id?: string
           purpose?: string
           token?: string
           token_type?: string
