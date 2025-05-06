@@ -8,38 +8,48 @@ const aonyxengineSecretAlgorithm = 'aes-256-gcm';
 
 const cache = new Map<string, string>();
 
-async function getToken(user_id: string, provider: string, purpose: string, token_type: string): Promise<SafelyResult<string>> {
+export type TokenData = {
+    token: string,
+    provider_user_id: string
+}
+
+async function getToken(user_id: string, provider: string, purpose: string, token_type: string): Promise<SafelyResult<TokenData>> {
     const key = `${user_id}.${provider}.${purpose}.${token_type}`;
 
-    if (cache.has(key))
-        return {
-            ok: true,
-            data: cache.get(key),
-        }
+    if (cache.has(key)) {
+        const parse = safelyRun(JSON.parse, cache.get(key)) as SafelyResult<TokenData>;
+        if (parse.ok === true)
+            return parse;
+    }
 
-    const { data: raw_token, error: raw_token_error } = await supabasePrivate.from('oauth_tokens').select('token')
+    const { data: raw_token, error: raw_token_error } = await supabasePrivate.from('oauth_tokens').select('token, provider_user_id')
         .eq('user_id', user_id).eq('token_type', token_type).eq('provider', provider).eq('purpose', purpose).single();
 
     if (raw_token_error)
-        return {
-            ok: false,
-            error: raw_token_error,
-        }
+        return safelyWrapError('failed to fetch token', raw_token_error);
 
-    const decrypted_token_request = safelyRun(() => decryptToken(raw_token.token, aonyxengineSecretAlgorithm, aonyxEngineSecretKey));
+    const decrypt_token_request = safelyRun(() => decryptToken(raw_token.token, aonyxengineSecretAlgorithm, aonyxEngineSecretKey));
 
-    if (decrypted_token_request.ok === false)
-        return safelyWrapError('failed to decrypt token', decrypted_token_request);
+    if (decrypt_token_request.ok === false)
+        return safelyWrapError('failed to decrypt token', decrypt_token_request);
 
-    cache.set(key, decrypted_token_request.data);
+    const token_data = {
+        token: decrypt_token_request.data,
+        provider_user_id: raw_token.provider_user_id
+    }
+    const token_data_string = safelyRun(JSON.stringify, token_data);
 
-    return decrypted_token_request;
+    if (token_data_string.ok === false)
+        return safelyWrapError('failed to stringify token data', token_data_string);
+
+    cache.set(key, token_data_string.data);
+    return { ok: true, data: token_data };
 }
 
-async function setToken(user_id: string, provider: string, purpose: string, token_type: string, token: string): Promise<SafelyResult<void>> {
+async function setToken(user_id: string, provider: string, purpose: string, token_type: string, token_data: TokenData): Promise<SafelyResult<void>> {
     const key = `${user_id}.${provider}.${purpose}.${token_type}`;
 
-    const encrypt_token_request = safelyRun(() => encryptToken(token, aonyxengineSecretAlgorithm, aonyxEngineSecretKey));
+    const encrypt_token_request = safelyRun(() => encryptToken(token_data.token, aonyxengineSecretAlgorithm, aonyxEngineSecretKey));
 
     if (encrypt_token_request.ok === false)
         return safelyWrapError('failed to encrypt token', encrypt_token_request);
@@ -52,15 +62,22 @@ async function setToken(user_id: string, provider: string, purpose: string, toke
             token_type,
             purpose,
             created_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
-        }, { onConflict: 'user_id, token_type' })
-        .eq('user_id', user_id).eq('token_type', token_type).single();
+            expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            provider_user_id: token_data.provider_user_id
+        }, { onConflict: 'user_id, provider, purpose, token_type' })
+        .eq('user_id', user_id).eq('token_type', token_type).eq('provider', provider).eq('purpose', purpose).single();
 
-    if (raw_token_error)
-        return safelyWrapError('failed to set token', raw_token_error);
+    if (raw_token_error) {
+        return safelyWrapError('failed to post token', raw_token_error);
+    }
 
-    cache.set(key, token);
-    
+    const token_data_string = safelyRun(JSON.stringify, token_data);
+
+    if (token_data_string.ok === false)
+        return safelyWrapError('failed to stringify token data', token_data_string);
+
+    cache.set(key, token_data_string.data);
+
     return {
         ok: true,
         data: undefined
