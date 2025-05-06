@@ -12,124 +12,59 @@ const providerMap = {
     }
 }
 
-//MARK: SUBSCRIPTIONS
-//TODO subscription function after successful websocket connection
-type TwitchTransportWebSocket = {
-    method: "websocket",
-    session_id: string,
-    connected_at?: string,
-    disconnected_at?: string
-}
-type TwitchTransportWebHook = {
-    method: "webhook",
-    callback: string,
-    secret: string,
-}
-type TwitchTransport = TwitchTransportWebHook | TwitchTransportWebSocket;
+//MARK: AUTH
+type TwitchRefreshTokenResponseSuccess = { access_token: string, refresh_token: string, scope: string[], token_type: string }
+type TwitchRefreshTokenResponseError = { error: string, status: number, message: string }
+type TwitchRefreshTokenResponse = TwitchRefreshTokenResponseSuccess | TwitchRefreshTokenResponseError
 
-/** required scopes 'user:read:chat' */
-type TwitchEventSubChannelChatMessage = {
-    type: "channel.chat.message",
-    version: "1",
-    condition: {
-        broadcaster_user_id: string,
-        user_id: string,
+async function getTwitchToken(user_id: string): Promise<SafelyResult<TokenData>> {
+    const access_token_request = await TokenManager.get(user_id, 'twitch', 'chatbot', 'access_token');
+
+    if (access_token_request.ok === true)
+        return access_token_request;
+
+    const refresh_token = await TokenManager.get(user_id, 'twitch', 'chatbot', 'refresh_token');
+
+    if (refresh_token.ok === false) {
+        return safelyWrapError(`failed to get refresh token for ${user_id}`, refresh_token);
     }
-    transport: TwitchTransport
-}
 
-/** required scopes 'moderator:read:followers' */
-type TwitchEventSubChannelFollow = {
-    type: "channel.follow",
-    version: "2",
-    condition: {
-        broadcaster_user_id: string,
-        moderator_user_id: string,
+    const twitch_refresh_request = await safelyRunAsync(() => fetch('https://id.twitch.tv/oauth2/token', {
+        method: 'POST',
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `client_id=${process.env.TWITCH_CLIENT_ID}&client_secret=${process.env.TWITCH_CLIENT_SECRET}&grant_type=refresh_token&refresh_token=${refresh_token.data.token}`
+    }).then(res => res.json()));
+
+    if (twitch_refresh_request.ok === false)
+        return safelyWrapError(`failed use refresh token for ${user_id}`, twitch_refresh_request);
+
+    const twitch_refresh_response: TwitchRefreshTokenResponse = twitch_refresh_request.data;
+    if (typeof twitch_refresh_response['error'] !== 'undefined') {
+        const error_response = twitch_refresh_response as TwitchRefreshTokenResponseError;
+        return {
+            ok: false,
+            error: new Error(`${error_response.error} ${error_response.status} ${error_response.message}`)
+        }
     }
-    transport: TwitchTransport
-}
 
-/** required scopes 'channel:read:subscriptions' */
-type TwitchEventSubChannelSubscribe = {
-    type: "channel.subscribe",
-    version: "1",
-    condition: {
-        broadcaster_user_id: string,
+    const success_response = twitch_refresh_response as TwitchRefreshTokenResponseSuccess;
+    const access_token: TokenData = { token: success_response.access_token, provider_user_id: refresh_token.data.provider_user_id };
+
+    const set_refresh_token_request = await TokenManager.set(user_id, 'twitch', 'chatbot', 'refresh_token', { token: success_response.refresh_token, provider_user_id: refresh_token.data.provider_user_id });
+    if (set_refresh_token_request.ok === false)
+        return set_refresh_token_request;
+
+    const set_access_token_request = await TokenManager.set(user_id, 'twitch', 'chatbot', 'access_token', access_token);
+    if (set_access_token_request.ok === false)
+        return set_access_token_request
+
+    return {
+        ok: true,
+        data: access_token
     }
-    transport: TwitchTransport
 }
-
-/** required scopes 'bits:read' */
-type TwitchEventSubChannelCheer = {
-    type: "channel.cheer",
-    version: "1",
-    condition: {
-        broadcaster_user_id: string,
-    }
-    transport: TwitchTransport
-}
-
-/** required scopes NONE */
-type TwitchEventSubChannelRaid = {
-    type: "channel.raid",
-    version: "1",
-    condition: {
-        to_broadcaster_user_id: string,
-    }
-    transport: TwitchTransport
-}
-
-/** required scopes 'channel:read:polls' */
-type TwitchEventSubChannelPollBegin = {
-    type: "channel.poll.begin",
-    version: "1",
-    condition: {
-        broadcaster_user_id: string,
-    }
-    transport: TwitchTransport
-}
-
-/** required scopes 'channel:read:polls' */
-type TwitchEventSubChannelPollEnd = {
-    type: "channel.poll.end",
-    version: "1",
-    condition: {
-        broadcaster_user_id: string,
-    }
-    transport: TwitchTransport
-}
-
-/** required scopes 'channel:read:redemptions' */
-type TwitchEventSubChannelAutomaticRedemption = {
-    type: "channel.channel_points_automatic_reward_redemption.add",
-    version: "1",
-    condition: {
-        broadcaster_user_id: string,
-    }
-    transport: TwitchTransport
-}
-
-/** required scopes 'channel:read:redemptions' */
-type TwitchEventSubChannelCustomRedemption = {
-    type: "channel.channel_points_custom_reward_redemption.add",
-    version: "1",
-    condition: {
-        broadcaster_user_id: string,
-        reward_id?: string,
-    }
-    transport: TwitchTransport
-}
-
-type TwitchEventSub =
-    | TwitchEventSubChannelChatMessage
-    | TwitchEventSubChannelFollow
-    | TwitchEventSubChannelSubscribe
-    | TwitchEventSubChannelCheer
-    | TwitchEventSubChannelRaid
-    | TwitchEventSubChannelPollBegin
-    | TwitchEventSubChannelPollEnd
-    | TwitchEventSubChannelAutomaticRedemption
-    | TwitchEventSubChannelCustomRedemption;
 
 async function subscribeEventSub(token: string, client_id: string, twitchEventSub: TwitchEventSub) {
     const header = {
